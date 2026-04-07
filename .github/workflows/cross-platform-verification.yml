@@ -1,0 +1,101 @@
+name: Cross-Platform Verification
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-verify:
+    name: Build and Verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            configure_command: cmake -B build -DCMAKE_BUILD_TYPE=Release
+            build_command: cmake --build build --parallel
+            python_command: python3
+            build_config: ""
+            use_xvfb: "1"
+          - os: macos-latest
+            configure_command: cmake -B build -DCMAKE_BUILD_TYPE=Release
+            build_command: cmake --build build --parallel
+            python_command: python3
+            build_config: ""
+            use_xvfb: "0"
+          - os: windows-latest
+            configure_command: cmake -B build
+            build_command: cmake --build build --config Release --parallel
+            python_command: python
+            build_config: Release
+            use_xvfb: "0"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev xvfb
+
+      - name: Configure CMake
+        run: ${{ matrix.configure_command }}
+
+      - name: Build targets
+        run: ${{ matrix.build_command }}
+
+      - name: Verify headless client/server flow
+        env:
+          CI_BUILD_CONFIG: ${{ matrix.build_config }}
+          CI_PREFER_GUI: "1"
+          CI_USE_XVFB: ${{ matrix.use_xvfb }}
+        run: ${{ matrix.python_command }} ci/verify_runtime.py
+
+      - name: Upload runtime artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ runner.os }}
+          path: |
+            runtime/logs
+            runtime/bitmaps
+          if-no-files-found: ignore
+
+  static-analysis:
+    name: Static Analysis (Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck report
+        run: |
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --std=c++17 \
+            --suppress=missingIncludeSystem \
+            client server common \
+            2> cppcheck-report.txt || true
+
+      - name: Upload cppcheck report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck-report.txt
