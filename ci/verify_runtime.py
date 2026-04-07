@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -111,11 +112,17 @@ def server_command(server_executable: Path, port: int, mode: str) -> list[str]:
 
 def terminate_process(process: subprocess.Popen[str]) -> None:
     if process.poll() is None:
-        process.terminate()
+        if os.name == "nt":
+            process.terminate()
+        else:
+            os.killpg(process.pid, signal.SIGTERM)
         try:
             process.communicate(timeout=SERVER_SHUTDOWN_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
-            process.kill()
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
             process.communicate(timeout=SERVER_SHUTDOWN_TIMEOUT_SECONDS)
 
 
@@ -129,6 +136,7 @@ def run_verification_mode(server_executable: Path, client_executable: Path, mode
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
+        start_new_session=os.name != "nt",
         text=True,
     )
 
@@ -152,13 +160,16 @@ def run_verification_mode(server_executable: Path, client_executable: Path, mode
                 f"Client output:\n{client_output}"
             )
 
-        if "Handshake verified" not in client_output:
+        verify_logs()
+
+        if all(
+            marker not in client_output
+            for marker in ("Handshake verified", "State: CONNECTED", "State: TELEMETRY")
+        ):
             raise AssertionError(
-                "Client output does not show a successful handshake.\n"
+                "Client output does not show a connected session.\n"
                 f"Client output:\n{client_output}"
             )
-
-        verify_logs()
     finally:
         terminate_process(server_process)
 

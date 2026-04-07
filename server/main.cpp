@@ -233,7 +233,7 @@ void generateWeatherMap(const std::string& path, const ClientSession& session, s
         altitudeBand = std::clamp(static_cast<int>(session.telemetry.altitude / 120.0f), 120, height - 1);
     }
 
-    const int stormFalloff = std::max(1, (stormRadius * stormRadius) / 255);
+    const int stormFalloff = (std::max)(1, (stormRadius * stormRadius) / 255);
     std::vector<std::uint8_t> row(static_cast<std::size_t>(width) * bytesPerPixel);
     for (int y = height - 1; y >= 0; --y) {
         for (int x = 0; x < width; ++x) {
@@ -241,13 +241,13 @@ void generateWeatherMap(const std::string& path, const ClientSession& session, s
 
             const int dx = x - stormCenterX;
             const int dy = y - stormCenterY;
-            const int stormIntensity = std::max(0, 255 - ((dx * dx + dy * dy) / stormFalloff));
+            const int stormIntensity = (std::max)(0, 255 - ((dx * dx + dy * dy) / stormFalloff));
             const int frontBand =
-                std::max(0, 120 - std::abs((((x + y) + frontOffset) % 240) - 120));
+                (std::max)(0, 120 - std::abs((((x + y) + frontOffset) % 240) - 120));
             const int altitudeStripe =
-                std::max(0, 90 - std::abs((((y * 2) + altitudeBand) % 180) - 90));
+                (std::max)(0, 90 - std::abs((((y * 2) + altitudeBand) % 180) - 90));
             const int turbulence =
-                std::max(0, 75 - std::abs((((x ^ y) + static_cast<int>(seed & 0xFFu)) % 150) - 75));
+                (std::max)(0, 75 - std::abs((((x ^ y) + static_cast<int>(seed & 0xFFu)) % 150) - 75));
 
             const int blueBase = 85 + ((x * 70) / width) + static_cast<int>((seed >> 16) & 0x1F);
             const int greenBase = 55 + ((y * 65) / height) + static_cast<int>((seed >> 8) & 0x1F);
@@ -354,7 +354,7 @@ bool sendWeatherMap(ClientSession& session, Logger& logger, SharedServerState& s
 
     for (std::uint32_t offset = 0; offset < payload.size; offset += static_cast<std::uint32_t>(kChunkSize)) {
         const std::uint32_t chunkSize =
-            std::min<std::uint32_t>(static_cast<std::uint32_t>(kChunkSize), payload.size - offset);
+            (std::min<std::uint32_t>)(static_cast<std::uint32_t>(kChunkSize), payload.size - offset);
         if (!sendAll(session.socket, payload.data + offset, chunkSize)) {
             handleFault(session, logger, sharedState, "FileChunkSendFailure");
             return false;

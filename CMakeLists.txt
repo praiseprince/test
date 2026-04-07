@@ -54,6 +54,7 @@ target_include_directories(ground_server
 target_link_libraries(ground_server PRIVATE common glfw OpenGL::GL)
 
 if(WIN32)
+  target_compile_definitions(common INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(aircraft_client PRIVATE ws2_32)
   target_link_libraries(ground_server PRIVATE ws2_32)
 endif()
